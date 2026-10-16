@@ -58,6 +58,11 @@ Cycle du suivi (`useTracker`) : `idle → tracking ⇄ paused → idle`. À l'ar
 
 Déclarées dans `android/app/src/main/AndroidManifest.xml` : `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`, `ACCESS_NETWORK_STATE`, `INTERNET`. Le GPS matériel est déclaré `required="false"` : l'app s'installe aussi sur les appareils sans GPS (mode Simulation).
 
+## Feuille de route
+
+- [`docs/CAHIER_DES_CHARGES.md`](docs/CAHIER_DES_CHARGES.md) : cible V2 (suivi en arrière-plan, SQLite, backend Supabase, dashboard dispatcher, missions de livraison, lien client, cartes hors-ligne…), exigences, architecture et risques.
+- [`docs/PROMPTS.md`](docs/PROMPTS.md) : un prompt d'exécution par lot, avec ses critères d'acceptation.
+
 ## Limites connues du MVP
 
 - Le suivi fonctionne app au premier plan. Pour un suivi écran éteint ou en arrière-plan, il faudra un service de premier plan Android (par ex. `@capacitor-community/background-geolocation`).
