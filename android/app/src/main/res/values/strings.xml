@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">GeoTrack</string>
+    <string name="title_activity_main">GeoTrack</string>
+    <string name="package_name">com.geotrack.app</string>
+    <string name="custom_url_scheme">com.geotrack.app</string>
+</resources>
