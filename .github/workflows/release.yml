@@ -11,7 +11,6 @@ jobs:
   release:
     runs-on: ubuntu-latest
     env:
-      GEOTRACK_KEYSTORE_PATH: ${{ runner.temp }}/release.jks
       GEOTRACK_KEYSTORE_PASSWORD: ${{ secrets.GEOTRACK_KEYSTORE_PASSWORD }}
       GEOTRACK_KEY_ALIAS: ${{ secrets.GEOTRACK_KEY_ALIAS }}
       GEOTRACK_KEY_PASSWORD: ${{ secrets.GEOTRACK_KEY_PASSWORD }}
@@ -27,8 +26,11 @@ jobs:
           java-version: 21
           cache: gradle
 
-      - name: Version depuis le tag
-        run: echo "GEOTRACK_VERSION_NAME=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+      # Le contexte `runner` n'est pas disponible dans `jobs.<id>.env` : variables calculées ici.
+      - name: Version depuis le tag + chemin du keystore
+        run: |
+          echo "GEOTRACK_VERSION_NAME=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          echo "GEOTRACK_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
 
       - name: Décoder le keystore
         env:
