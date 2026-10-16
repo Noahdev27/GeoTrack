@@ -55,31 +55,61 @@ export function activeDuration(trip: Pick<Trip, 'activeDurationMs' | 'resumedAt'
 /** Au-delà de ce délai sans nouveau point, la vitesse instantanée est considérée nulle. */
 const STALE_SPEED_MS = 10_000;
 
-/** Calcule l'ensemble des métriques d'un trajet. */
-export function computeStats(trip: Pick<Trip, 'points' | 'activeDurationMs' | 'resumedAt'>, now: number): TripStats {
-  const { points } = trip;
-  const distanceMeters = totalDistance(points);
-  const durationMs = activeDuration(trip, now);
-  const avgSpeedKmh = durationMs > 0 ? msToKmh(distanceMeters / (durationMs / 1000)) : 0;
+/**
+ * Accumulateur incrémental des métriques : chaque point est intégré en O(1),
+ * sans repasser sur l'historique (trajets longs, mise à jour à chaque relevé).
+ */
+export class TripAccumulator {
+  distanceMeters = 0;
+  maxSpeedKmh = 0;
+  count = 0;
+  private last: TrackPoint | undefined;
+  private prev: TrackPoint | undefined;
 
-  let maxSpeedKmh = 0;
-  for (let i = 1; i < points.length; i++) {
-    if (points[i].segment !== points[i - 1].segment) continue;
-    const s = points[i].speed != null ? msToKmh(points[i].speed!) : segmentSpeedKmh(points[i - 1], points[i]);
-    if (Number.isFinite(s)) maxSpeedKmh = Math.max(maxSpeedKmh, s);
+  constructor(points: readonly TrackPoint[] = []) {
+    for (const p of points) this.add(p);
   }
 
-  let currentSpeedKmh = 0;
-  const last = points.at(-1);
-  if (last && trip.resumedAt !== null && now - last.timestamp <= STALE_SPEED_MS) {
-    if (last.speed != null && last.speed >= 0) {
-      currentSpeedKmh = msToKmh(last.speed);
-    } else if (points.length >= 2 && points.at(-2)!.segment === last.segment) {
-      currentSpeedKmh = segmentSpeedKmh(points.at(-2)!, last);
+  add(point: TrackPoint): void {
+    const last = this.last;
+    if (last && last.segment === point.segment) {
+      this.distanceMeters += haversineDistance(last, point);
+      const s = point.speed != null ? msToKmh(point.speed) : segmentSpeedKmh(last, point);
+      if (Number.isFinite(s)) this.maxSpeedKmh = Math.max(this.maxSpeedKmh, s);
     }
+    this.prev = last;
+    this.last = point;
+    this.count++;
   }
 
-  return { distanceMeters, durationMs, avgSpeedKmh, currentSpeedKmh, maxSpeedKmh };
+  /** Métriques à l'instant `now` (la durée active dépend de l'état pause / suivi). */
+  stats(trip: Pick<Trip, 'activeDurationMs' | 'resumedAt'>, now: number): TripStats {
+    const durationMs = activeDuration(trip, now);
+    const avgSpeedKmh = durationMs > 0 ? msToKmh(this.distanceMeters / (durationMs / 1000)) : 0;
+
+    let currentSpeedKmh = 0;
+    const { last, prev } = this;
+    if (last && trip.resumedAt !== null && now - last.timestamp <= STALE_SPEED_MS) {
+      if (last.speed != null && last.speed >= 0) {
+        currentSpeedKmh = msToKmh(last.speed);
+      } else if (prev && prev.segment === last.segment) {
+        currentSpeedKmh = segmentSpeedKmh(prev, last);
+      }
+    }
+
+    return {
+      distanceMeters: this.distanceMeters,
+      durationMs,
+      avgSpeedKmh,
+      currentSpeedKmh,
+      maxSpeedKmh: this.maxSpeedKmh,
+    };
+  }
+}
+
+/** Calcule l'ensemble des métriques d'un trajet (version non incrémentale, O(n)). */
+export function computeStats(trip: Pick<Trip, 'points' | 'activeDurationMs' | 'resumedAt'>, now: number): TripStats {
+  return new TripAccumulator(trip.points).stats(trip, now);
 }
 
 export interface PointFilterOptions {

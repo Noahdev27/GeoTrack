@@ -53,11 +53,16 @@ test('hors-ligne : le trajet reste en attente puis se synchronise au retour du r
   await expect(page.getByRole('dialog').getByText('Synchronisé')).toBeVisible();
 });
 
-test('le trajet survit à un rechargement de la page', async ({ page }) => {
+test('un rechargement en plein suivi (app tuée) restaure le trajet avec ses points', async ({ page }) => {
+  await page.getByRole('radio', { name: '×10' }).click();
   await page.getByRole('button', { name: /Démarrer/ }).click();
-  await expect(page.getByText('Suivi en cours')).toBeVisible();
-  await page.getByRole('button', { name: /Pause/ }).click(); // force la sauvegarde du trajet actif
-  await page.reload();
+  const distance = page.locator('.metric', { hasText: 'Distance' }).locator('.metric-value');
+  await expect(distance).toHaveText(/[1-9]\d* m$| km$/, { timeout: 10_000 });
+  await page.waitForTimeout(2500); // laisse passer une écriture périodique des points (2 s)
+  await page.reload(); // sans Pause ni Terminer
+
   await expect(page.getByText(/Trajet interrompu récupéré/)).toBeVisible();
   await expect(page.getByRole('button', { name: /Reprendre/ })).toBeVisible();
+  await expect(distance).not.toHaveText('0 m');
+  await expect(page.locator('.route-trace')).toHaveCount(1);
 });

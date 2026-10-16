@@ -1,102 +1,61 @@
-import { Preferences } from '@capacitor/preferences';
+import { Capacitor } from '@capacitor/core';
 import type { Trip, TripSummary } from '../types';
 import { computeStats } from '../utils/geo';
+import { IndexedDbTripRepository } from './db/indexedDbRepository';
+import { migrateFromPreferences } from './db/migrateFromPreferences';
+import { SqliteTripRepository } from './db/sqliteRepository';
+import { capacitorSqliteDriver } from './db/sqlDriver';
+import { metaOf, summaryOf, type TripRepository } from './db/types';
 
 /**
- * Stockage offline des trajets via Capacitor Preferences
- * (SharedPreferences sur Android, localStorage sur le web).
- *
- * Schéma :
- *  - `geotrack:index`      → TripSummary[] (historique léger, du plus récent au plus ancien)
- *  - `geotrack:trip:<id>`  → Trip complet (avec tous les points)
- *  - `geotrack:active`     → Trip en cours, pour reprise après fermeture / crash de l'app
+ * Stockage offline des trajets.
+ *  - Android : SQLite (@capacitor-community/sqlite), points append-only.
+ *  - Web : IndexedDB.
+ * Au premier accès, le schéma est créé et les données du MVP (Capacitor Preferences) sont importées.
  */
-const INDEX_KEY = 'geotrack:index';
-const ACTIVE_KEY = 'geotrack:active';
-const tripKey = (id: string) => `geotrack:trip:${id}`;
 
-async function readJson<T>(key: string): Promise<T | null> {
-  const { value } = await Preferences.get({ key });
-  if (!value) return null;
-  try {
-    return JSON.parse(value) as T;
-  } catch {
-    console.warn(`[storage] Valeur corrompue pour ${key}, ignorée`);
-    return null;
-  }
+export type { TripRepository, TripMeta } from './db/types';
+
+let repository: Promise<TripRepository> | null = null;
+
+async function createRepository(): Promise<TripRepository> {
+  const repo = Capacitor.isNativePlatform()
+    ? new SqliteTripRepository(await capacitorSqliteDriver())
+    : new IndexedDbTripRepository();
+  await repo.init();
+  const imported = await migrateFromPreferences(repo);
+  if (imported > 0) console.info(`[storage] ${imported} trajet(s) importé(s) depuis le stockage v0.1`);
+  return repo;
 }
 
-const writeJson = (key: string, value: unknown) => Preferences.set({ key, value: JSON.stringify(value) });
+function repo(): Promise<TripRepository> {
+  repository ??= createRepository().catch((err: unknown) => {
+    repository = null; // nouvel essai au prochain accès
+    throw err;
+  });
+  return repository;
+}
 
-// Les mises à jour de l'index sont sérialisées pour éviter les écritures concurrentes (read-modify-write).
-let queue: Promise<unknown> = Promise.resolve();
-function serialized<T>(task: () => Promise<T>): Promise<T> {
-  const run = queue.then(task, task);
-  queue = run.catch(() => undefined);
-  return run;
+/** Réinitialise la connexion (tests uniquement). */
+export function resetTripStorageForTests(): void {
+  repository = null;
 }
 
 export function toSummary(trip: Trip): TripSummary {
-  return {
-    id: trip.id,
-    name: trip.name,
-    mode: trip.mode,
-    startedAt: trip.startedAt,
-    endedAt: trip.endedAt,
-    stats: computeStats(trip, trip.endedAt ?? trip.updatedAt),
-    syncedAt: trip.syncedAt,
-  };
+  return summaryOf(metaOf(trip), computeStats(trip, trip.endedAt ?? trip.updatedAt));
 }
 
-export const tripStorage = {
-  async listTrips(): Promise<TripSummary[]> {
-    return (await readJson<TripSummary[]>(INDEX_KEY)) ?? [];
-  },
-
-  getTrip(id: string): Promise<Trip | null> {
-    return readJson<Trip>(tripKey(id));
-  },
-
-  saveTrip(trip: Trip): Promise<void> {
-    return serialized(async () => {
-      await writeJson(tripKey(trip.id), trip);
-      const index = (await readJson<TripSummary[]>(INDEX_KEY)) ?? [];
-      const next = [toSummary(trip), ...index.filter((t) => t.id !== trip.id)].sort(
-        (a, b) => b.startedAt - a.startedAt,
-      );
-      await writeJson(INDEX_KEY, next);
-    });
-  },
-
-  deleteTrip(id: string): Promise<void> {
-    return serialized(async () => {
-      await Preferences.remove({ key: tripKey(id) });
-      const index = (await readJson<TripSummary[]>(INDEX_KEY)) ?? [];
-      await writeJson(
-        INDEX_KEY,
-        index.filter((t) => t.id !== id),
-      );
-    });
-  },
-
-  async markSynced(id: string, syncedAt: number): Promise<void> {
-    const trip = await this.getTrip(id);
-    if (!trip) return;
-    await this.saveTrip({ ...trip, syncedAt });
-  },
-
-  async listUnsynced(): Promise<TripSummary[]> {
-    return (await this.listTrips()).filter((t) => t.endedAt !== null && t.syncedAt === null);
-  },
-
-  loadActiveTrip(): Promise<Trip | null> {
-    return readJson<Trip>(ACTIVE_KEY);
-  },
-
-  async saveActiveTrip(trip: Trip | null): Promise<void> {
-    if (trip) await writeJson(ACTIVE_KEY, trip);
-    else await Preferences.remove({ key: ACTIVE_KEY });
-  },
+/** Point d'accès unique au stockage, initialisé paresseusement. */
+export const tripStorage: Omit<TripRepository, 'init'> = {
+  listTrips: () => repo().then((r) => r.listTrips()),
+  getTrip: (id) => repo().then((r) => r.getTrip(id)),
+  saveTrip: (trip) => repo().then((r) => r.saveTrip(trip)),
+  saveTripMeta: (meta, stats) => repo().then((r) => r.saveTripMeta(meta, stats)),
+  appendPoints: (tripId, points) => repo().then((r) => r.appendPoints(tripId, points)),
+  deleteTrip: (id) => repo().then((r) => r.deleteTrip(id)),
+  markSynced: (id, at) => repo().then((r) => r.markSynced(id, at)),
+  listUnsynced: () => repo().then((r) => r.listUnsynced()),
+  loadActiveTrip: () => repo().then((r) => r.loadActiveTrip()),
 };
 
 export type TripStorage = typeof tripStorage;

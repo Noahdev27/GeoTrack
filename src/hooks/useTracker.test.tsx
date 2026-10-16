@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import { memoryStore } from '../test/mocks';
+import { FAKE_TIMERS, memoryStore } from '../test/mocks';
 import type { Trip } from '../types';
 
 vi.mock('@capacitor/preferences', async () => (await import('../test/mocks')).preferencesMock);
@@ -18,16 +18,28 @@ vi.mock('../services/sync', () => ({ syncService: { syncNow: vi.fn(async () => {
 
 const { useTracker } = await import('./useTracker');
 const { Geolocation } = await import('@capacitor/geolocation');
-const { tripStorage } = await import('../services/storage');
+const { tripStorage, resetTripStorageForTests } = await import('../services/storage');
 const { syncService } = await import('../services/sync');
 
 /** Laisse s'écouler `ms` (timers + promesses) dans un act(). */
 const elapse = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms));
 
+/**
+ * Attend une condition en laissant tourner les vraies macro-tâches (fake-indexeddb utilise setImmediate,
+ * que vi.waitFor ne laisse pas s'exécuter sous faux timers).
+ */
+async function until(condition: () => boolean) {
+  for (let i = 0; i < 100 && !condition(); i++) {
+    await act(() => new Promise<void>((resolve) => setImmediate(resolve)));
+  }
+  expect(condition()).toBe(true);
+}
+
 describe('useTracker', () => {
   beforeEach(() => {
     memoryStore.clear();
-    vi.useFakeTimers();
+    resetTripStorageForTests();
+    vi.useFakeTimers(FAKE_TIMERS);
     vi.setSystemTime(new Date(2026, 9, 16, 10, 0, 0));
   });
   afterEach(() => vi.useRealTimers());
@@ -117,11 +129,10 @@ describe('useTracker', () => {
       updatedAt: t0 + 20_000,
       syncedAt: null,
     };
-    await tripStorage.saveActiveTrip(interrupted);
+    await tripStorage.saveTrip(interrupted);
 
     const { result } = renderHook(() => useTracker());
-    await elapse(0);
-    expect(result.current.status).toBe('paused');
+    await until(() => result.current.status === 'paused');
     expect(result.current.restored).toBe(true);
     // Le temps écoulé pendant que l'app était fermée n'est pas compté.
     expect(result.current.stats!.durationMs).toBe(20_000);
@@ -129,6 +140,23 @@ describe('useTracker', () => {
     await act(() => result.current.resume());
     await elapse(2000);
     expect(result.current.trip!.points.at(-1)!.segment).toBe(1);
+  });
+
+  it('les points sont écrits pendant le suivi : un arrêt brutal de l’app ne perd que les 2 dernières secondes', async () => {
+    const first = renderHook(() => useTracker());
+    await act(() => first.result.current.start());
+    await elapse(10_000);
+    const recorded = first.result.current.trip!.points.length;
+    await until(() => true); // laisse IndexedDB terminer les écritures en cours
+    first.unmount(); // l'app est tuée sans « Terminer »
+
+    resetTripStorageForTests();
+    const second = renderHook(() => useTracker());
+    await until(() => second.result.current.status === 'paused');
+    const restoredPoints = second.result.current.trip!.points.length;
+    expect(restoredPoints).toBeGreaterThanOrEqual(recorded - 2);
+    expect(restoredPoints).toBeLessThanOrEqual(recorded);
+    expect(second.result.current.stats!.distanceMeters).toBeGreaterThan(50);
   });
 
   it('interdit de changer de mode pendant un suivi', async () => {

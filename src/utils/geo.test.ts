@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { TrackPoint } from '../types';
-import { activeDuration, bearing, computeStats, haversineDistance, shouldAcceptPoint, totalDistance } from './geo';
+import {
+  activeDuration,
+  bearing,
+  computeStats,
+  haversineDistance,
+  shouldAcceptPoint,
+  totalDistance,
+  TripAccumulator,
+} from './geo';
 
 const pt = (lat: number, lng: number, timestamp: number, segment = 0, extra: Partial<TrackPoint> = {}): TrackPoint => ({
   lat,
@@ -99,5 +107,56 @@ describe('shouldAcceptPoint', () => {
   });
   it('accepte un déplacement normal', () => {
     expect(shouldAcceptPoint(prev, pt(0.001, 0, 10_000))).toBe(true);
+  });
+});
+
+describe('TripAccumulator', () => {
+  /** Générateur pseudo-aléatoire déterministe (mulberry32). */
+  function rng(seed: number) {
+    return () => {
+      seed |= 0;
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function randomTrack(seed: number, n: number): TrackPoint[] {
+    const r = rng(seed);
+    let lat = 48.85;
+    let lng = 2.35;
+    let t = 0;
+    let segment = 0;
+    return Array.from({ length: n }, () => {
+      lat += (r() - 0.5) * 0.001;
+      lng += (r() - 0.5) * 0.001;
+      t += 500 + Math.floor(r() * 2000);
+      if (r() < 0.02) segment++;
+      return pt(lat, lng, t, segment, r() < 0.5 ? { speed: r() * 30 } : {});
+    });
+  }
+
+  it.each([1, 2, 3, 42, 1337])('donne exactement les mêmes métriques que computeStats (graine %i)', (seed) => {
+    const points = randomTrack(seed, 500);
+    const acc = new TripAccumulator();
+    points.forEach((p, i) => {
+      acc.add(p);
+      if (i % 97 === 0 || i === points.length - 1) {
+        const trip = { points: points.slice(0, i + 1), activeDurationMs: 1000, resumedAt: 0 };
+        const now = p.timestamp + 1000;
+        expect(acc.stats(trip, now)).toEqual(computeStats(trip, now));
+      }
+    });
+  });
+
+  it('ingère 20 000 points en moins de 200 ms', () => {
+    const points = randomTrack(7, 20_000);
+    const start = performance.now();
+    const acc = new TripAccumulator();
+    for (const p of points) acc.add(p);
+    acc.stats({ activeDurationMs: 0, resumedAt: 0 }, points.at(-1)!.timestamp);
+    expect(performance.now() - start).toBeLessThan(200);
+    expect(acc.count).toBe(20_000);
   });
 });

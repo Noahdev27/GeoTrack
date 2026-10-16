@@ -59,14 +59,14 @@ npm run build && npm run test:e2e   # Playwright (viewport mobile)
 
 ## Fonctionnalités
 
-| Fonctionnalité    | Implémentation                                                                                                                                                                                                                                                             |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Carte interactive | `components/MapView.tsx` : tuiles OpenStreetMap, tracé par segment (pas de ligne fantôme après une pause), marqueur orienté selon le cap, cercle de précision GPS, suivi automatique désactivé au glisser + bouton de recentrage, recadrage sur un trajet de l'historique. |
-| Simulation GPS    | `services/simulation.ts` : véhicule qui suit un itinéraire point par point (Louvre → Tour Eiffel), vitesse réaliste variable, bruit GPS, accélération ×1 / ×2 / ×5 / ×10, aller-retour continu.                                                                            |
-| GPS natif         | `hooks/useGeolocation.ts` : `@capacitor/geolocation` (haute précision, `watchPosition`), vérification et demande des permissions, gestion du refus, de la localisation approximative (Android 12+) et des services de localisation désactivés.                             |
-| Dashboard         | `components/Dashboard.tsx` + `utils/geo.ts` : distance (Haversine), temps actif hors pauses, vitesse moyenne, instantanée et max. Les relevés bruités sont filtrés (précision > 50 m, micro-déplacements < 3 m, sauts aberrants > 250 km/h).                               |
-| Offline-first     | `services/storage.ts` : trajets stockés avec `@capacitor/preferences` (SharedPreferences sur Android, localStorage sur le web). Le trajet en cours est sauvegardé toutes les 10 s et au passage en arrière-plan, puis proposé à la reprise si l'app a été tuée.            |
-| Synchronisation   | `services/sync.ts` : file des trajets non synchronisés, envoi dès que `@capacitor/network` signale le réseau, nouvel essai avec backoff exponentiel (5 s → 5 min).                                                                                                         |
+| Fonctionnalité    | Implémentation                                                                                                                                                                                                                                                                                                                   |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Carte interactive | `components/MapView.tsx` : tuiles OpenStreetMap, tracé par segment (pas de ligne fantôme après une pause), marqueur orienté selon le cap, cercle de précision GPS, suivi automatique désactivé au glisser + bouton de recentrage, recadrage sur un trajet de l'historique.                                                       |
+| Simulation GPS    | `services/simulation.ts` : véhicule qui suit un itinéraire point par point (Louvre → Tour Eiffel), vitesse réaliste variable, bruit GPS, accélération ×1 / ×2 / ×5 / ×10, aller-retour continu.                                                                                                                                  |
+| GPS natif         | `hooks/useGeolocation.ts` : `@capacitor/geolocation` (haute précision, `watchPosition`), vérification et demande des permissions, gestion du refus, de la localisation approximative (Android 12+) et des services de localisation désactivés.                                                                                   |
+| Dashboard         | `components/Dashboard.tsx` + `utils/geo.ts` : distance (Haversine), temps actif hors pauses, vitesse moyenne, instantanée et max. Les relevés bruités sont filtrés (précision > 50 m, micro-déplacements < 3 m, sauts aberrants > 250 km/h).                                                                                     |
+| Offline-first     | `services/db/` + `services/storage.ts` : SQLite sur Android (`@capacitor-community/sqlite`), IndexedDB sur le web. Les points sont ajoutés par lots toutes les 2 s (et au passage en arrière-plan) : si l'app est tuée, le trajet est proposé à la reprise. Les données de la v0.1 (Preferences) sont importées automatiquement. |
+| Synchronisation   | `services/sync.ts` : file des trajets non synchronisés, envoi dès que `@capacitor/network` signale le réseau, nouvel essai avec backoff exponentiel (5 s → 5 min).                                                                                                                                                               |
 
 ### Configurer le backend de synchronisation
 
@@ -79,7 +79,7 @@ src/
 ├── components/   MapView, Dashboard, Controls, StatusBar, TripHistory
 ├── hooks/        useGeolocation (GPS natif + permissions), useTracker (machine à états du suivi),
 │                 useSync, useTripHistory
-├── services/     simulation (GPS simulé), storage (Preferences), sync (file offline + réseau)
+├── services/     simulation (GPS simulé), db/ (SQLite / IndexedDB), storage (façade), tripPersister, sync
 ├── types/        LatLng, TrackPoint, Trip, TripStats, SyncState…
 └── utils/        geo (distance, vitesse, filtrage), format (affichage fr-FR)
 ```
@@ -99,4 +99,3 @@ Déclarées dans `android/app/src/main/AndroidManifest.xml` : `ACCESS_FINE_LOCAT
 
 - Le suivi fonctionne app au premier plan. Pour un suivi écran éteint ou en arrière-plan, il faudra un service de premier plan Android (par ex. `@capacitor-community/background-geolocation`).
 - Les tuiles de carte ne sont pas mises en cache : hors-ligne, le tracé et les métriques restent disponibles mais pas le fond de carte.
-- Preferences convient aux volumes d'un MVP. Pour des centaines de trajets longs, il faudra passer à SQLite (`@capacitor-community/sqlite`).

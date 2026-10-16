@@ -1,17 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Trip } from '../types';
+import { FAKE_TIMERS } from '../test/mocks';
 
-const store = new Map<string, string>();
-vi.mock('@capacitor/preferences', () => ({
-  Preferences: {
-    get: async ({ key }: { key: string }) => ({ value: store.get(key) ?? null }),
-    set: async ({ key, value }: { key: string; value: string }) => void store.set(key, value),
-    remove: async ({ key }: { key: string }) => void store.delete(key),
-  },
-}));
+vi.mock('@capacitor/preferences', async () => (await import('../test/mocks')).preferencesMock);
 vi.mock('@capacitor/network', () => ({ Network: {} }));
 
-const { tripStorage } = await import('./storage');
+const { tripStorage, resetTripStorageForTests } = await import('./storage');
 const { SyncService, httpTransport, mockTransport } = await import('./sync');
 
 const trip = (id: string): Trip => ({
@@ -44,7 +38,7 @@ function fakeNetwork(initial: boolean) {
 }
 
 describe('SyncService', () => {
-  beforeEach(() => store.clear());
+  beforeEach(() => resetTripStorageForTests());
   afterEach(() => vi.useRealTimers());
 
   it('envoie les trajets en attente quand le réseau est disponible', async () => {
@@ -76,7 +70,7 @@ describe('SyncService', () => {
   });
 
   it('réessaie après un échec (backoff)', async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers(FAKE_TIMERS);
     await tripStorage.saveTrip(trip('a'));
     const upload = vi.fn().mockRejectedValueOnce(new Error('HTTP 503')).mockResolvedValue(undefined);
     const svc = new SyncService({ upload }, tripStorage, fakeNetwork(true));
@@ -137,7 +131,7 @@ describe('transports', () => {
   });
 
   it('mockTransport échoue hors-ligne', async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers(FAKE_TIMERS);
     vi.stubGlobal('navigator', { onLine: false });
     const upload = mockTransport(10).upload(trip('a'));
     const assertion = expect(upload).rejects.toThrow('Réseau indisponible');

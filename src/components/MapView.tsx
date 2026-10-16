@@ -1,7 +1,8 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Circle, CircleMarker, MapContainer, Marker, Polyline, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import type { LatLng, TrackPoint } from '../types';
+import { metersPerPixel, simplifyPath } from '../utils/simplify';
 
 export interface MapViewProps {
   /** Points du tracé affiché (trajet en cours ou trajet consulté). */
@@ -92,9 +93,34 @@ function AutoResize() {
   return null;
 }
 
+/** Au-delà de ce nombre de points, le tracé affiché est simplifié (les données restent intactes). */
+const SIMPLIFY_THRESHOLD = 2000;
+
+/** Tracé du trajet, simplifié selon le zoom pour rester fluide sur les longs trajets. */
+function TraceLayer({ points }: { points: readonly TrackPoint[] }) {
+  const map = useMap();
+  const [zoom, setZoom] = useState(() => map.getZoom());
+  useMapEvents({ zoomend: () => setZoom(map.getZoom()) });
+  const segments = useMemo(() => splitSegments(points), [points]);
+  const displayed = useMemo(() => {
+    if (points.length <= SIMPLIFY_THRESHOLD) return segments;
+    // Tolérance ≈ 1 pixel : la simplification est invisible à l'écran.
+    const tolerance = metersPerPixel(points[0].lat, zoom);
+    return segments.map((seg) => simplifyPath(seg, tolerance));
+  }, [segments, points, zoom]);
+
+  return displayed.map((seg, i) => (
+    <Polyline
+      key={i}
+      positions={seg}
+      className="route-trace"
+      pathOptions={{ weight: 5, lineCap: 'round', lineJoin: 'round' }}
+    />
+  ));
+}
+
 export function MapView(props: MapViewProps) {
   const { points, position, heading, accuracy, plannedRoute, follow, onFollowChange, fitKey, initialCenter } = props;
-  const segments = useMemo(() => splitSegments(points), [points]);
   // Cap arrondi à 5° pour ne pas recréer l'icône à chaque relevé.
   const headingBucket = heading == null || !Number.isFinite(heading) ? null : Math.round(heading / 5) * 5;
   const icon = useMemo(() => vehicleIcon(headingBucket), [headingBucket]);
@@ -114,14 +140,7 @@ export function MapView(props: MapViewProps) {
           pathOptions={{ weight: 4, dashArray: '6 8' }}
         />
       )}
-      {segments.map((seg, i) => (
-        <Polyline
-          key={i}
-          positions={seg}
-          className="route-trace"
-          pathOptions={{ weight: 5, lineCap: 'round', lineJoin: 'round' }}
-        />
-      ))}
+      <TraceLayer points={points} />
       {start && (
         <CircleMarker
           center={toTuple(start)}
