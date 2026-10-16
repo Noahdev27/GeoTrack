@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { MapView } from './components/MapView';
 import { Dashboard } from './components/Dashboard';
 import { Controls } from './components/Controls';
@@ -14,6 +15,7 @@ import { computeStats } from './utils/geo';
 import { formatDateTime } from './utils/format';
 import { ExportActions } from './components/ExportActions';
 import { shareTrip } from './services/exportService';
+import { openAppSettings } from './services/location/locationWatcher';
 import type { ExportFormat } from './utils/export';
 
 /** Marqueur : le message affiché après l'enregistrement suit l'état de la synchro en direct. */
@@ -193,6 +195,15 @@ export default function App() {
                 ✕
               </button>
             )}
+          </p>
+        )}
+        {Capacitor.isNativePlatform() && tracker.mode === 'gps' && !active && !viewedTrip && (
+          <p className="notice">
+            Le suivi continue écran éteint (notification « suivi en cours »). Pour éviter que le téléphone ne
+            l’interrompe, désactivez l’optimisation de batterie pour GeoTrack.
+            <button type="button" className="link" onClick={() => void openAppSettings()}>
+              Réglages
+            </button>
           </p>
         )}
         {tracker.mode === 'gps' && tracker.approximateLocation && (

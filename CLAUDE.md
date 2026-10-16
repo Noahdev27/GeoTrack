@@ -25,7 +25,9 @@ npx cap sync android
 - `src/services` : simulation GPS, synchro (`SyncService` : file + backoff, transport injectable), `TripPersister` (tampon de points, écritures par lots sérialisées). Pas de React ici.
 - `src/services/db` : interface `TripRepository` (append-only) avec deux implémentations testées par la même suite de contrat : SQLite (`@capacitor-community/sqlite`, Android) et IndexedDB (web). Schéma versionné dans `schema.ts` (ne jamais modifier une migration publiée). `storage.ts` est la façade (`tripStorage`) et importe au premier lancement les données v0.1 (Preferences).
 - Métriques : `TripAccumulator` (`utils/geo.ts`) intègre chaque point en O(1) ; `computeStats` en est la version batch.
+- `src/services/location/locationWatcher.ts` : source de positions. Android → `@capacitor-community/background-geolocation` (service de premier plan, suivi écran éteint ; le paquet ne fournit que des types, l'objet vient de `registerPlugin('BackgroundGeolocation')`) ; web → `@capacitor/geolocation`. Les permissions restent demandées via `@capacitor/geolocation` (`requestPermissions: false` côté plugin d'arrière-plan).
 - `src/hooks` : `useTracker` (machine à états idle → tracking ⇄ paused), `useGeolocation` (plugin natif + permissions), `useSync`, `useTripHistory`.
+- Tests sur appareil (permissions, écran éteint, kill, batterie) : `docs/TESTS_MANUELS.md`, à dérouler avant chaque release.
 - `src/components` : présentation (MapView, Dashboard, Controls, StatusBar, TripHistory).
 - `android/` est commité. Les permissions vivent dans `android/app/src/main/AndroidManifest.xml`.
 

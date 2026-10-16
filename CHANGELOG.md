@@ -11,6 +11,9 @@ Toutes les évolutions notables de GeoTrack. Format : [Keep a Changelog](https:/
 
 - Export d'un trajet en GPX 1.1, GeoJSON et CSV (feuille de partage native sur Android, téléchargement sur le web).
 
+- Suivi GPS en arrière-plan sur Android (écran éteint, autre app au premier plan) via un service de premier plan avec notification persistante ; raccourci vers les réglages pour l'optimisation de batterie.
+- Checklist de tests manuels sur appareil (`docs/TESTS_MANUELS.md`).
+
 ### Modifié
 
 - Stockage : SQLite sur Android, IndexedDB sur le web, points ajoutés au fil de l'eau (plus de réécriture complète du trajet) ; migration automatique des données v0.1.

@@ -1,27 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { Geolocation, type PermissionStatus as CapPermissionStatus, type Position } from '@capacitor/geolocation';
+import { Geolocation, type PermissionStatus as CapPermissionStatus } from '@capacitor/geolocation';
 import type { PermissionStatus } from '../types';
+import { watchLocation, type GeoFix, type StopWatching } from '../services/location/locationWatcher';
 
-export interface GeoFix {
-  lat: number;
-  lng: number;
-  timestamp: number;
-  accuracy: number | null;
-  speed: number | null;
-  altitude: number | null;
-  heading: number | null;
-}
-
-const toFix = (p: Position): GeoFix => ({
-  lat: p.coords.latitude,
-  lng: p.coords.longitude,
-  timestamp: p.timestamp,
-  accuracy: p.coords.accuracy ?? null,
-  speed: p.coords.speed ?? null,
-  altitude: p.coords.altitude ?? null,
-  heading: p.coords.heading ?? null,
-});
+export type { GeoFix } from '../services/location/locationWatcher';
 
 function mapPermission(s: CapPermissionStatus): PermissionStatus {
   if (s.location === 'granted' || s.coarseLocation === 'granted') return 'granted';
@@ -31,7 +14,14 @@ function mapPermission(s: CapPermissionStatus): PermissionStatus {
 
 /** Traduit les erreurs natives / web en messages compréhensibles. */
 export function describeGeoError(err: unknown): string {
-  const raw = err instanceof Error ? err.message : typeof err === 'string' ? err : JSON.stringify(err);
+  const raw =
+    err instanceof Error
+      ? err.message
+      : typeof err === 'string'
+        ? err
+        : err && typeof err === 'object' && typeof (err as { message?: unknown }).message === 'string'
+          ? (err as { message: string }).message
+          : JSON.stringify(err);
   const msg = raw.toLowerCase();
   if (msg.includes('denied') || msg.includes('permission')) {
     return "Accès à la localisation refusé. Autorisez GeoTrack dans les réglages de l'appareil.";
@@ -69,14 +59,17 @@ async function readPermission(): Promise<PermissionState> {
   }
 }
 
+/** Code d'erreur « permission refusée » (GeolocationPositionError web / plugin d'arrière-plan). */
+const isPermissionError = (code: string | number | undefined) => code === 1 || code === 'NOT_AUTHORIZED';
+
 /**
- * Accès à la géolocalisation native (plugin Capacitor) avec gestion des permissions.
- * Sur le web, le plugin délègue à `navigator.geolocation` (le navigateur affiche sa propre invite).
+ * Géolocalisation avec gestion des permissions.
+ * Android : suivi en arrière-plan (service de premier plan) ; web : navigator.geolocation.
  */
 export function useGeolocation() {
   const [permission, setPermission] = useState<PermissionStatus>('unknown');
   const [approximate, setApproximate] = useState(false);
-  const watchId = useRef<string | null>(null);
+  const stopRef = useRef<StopWatching | null>(null);
 
   const applyPermission = useCallback((state: PermissionState) => {
     setPermission(state.permission);
@@ -113,30 +106,24 @@ export function useGeolocation() {
   }, [checkPermission, applyPermission]);
 
   const stopWatch = useCallback(() => {
-    if (watchId.current) {
-      void Geolocation.clearWatch({ id: watchId.current });
-      watchId.current = null;
-    }
+    const stop = stopRef.current;
+    stopRef.current = null;
+    if (stop) void stop().catch(() => undefined);
   }, []);
 
   const startWatch = useCallback(
     async (onFix: (fix: GeoFix) => void, onError: (message: string) => void) => {
       stopWatch();
-      const id = await Geolocation.watchPosition(
-        { enableHighAccuracy: true, timeout: 20_000, maximumAge: 0, minimumUpdateInterval: 1000 },
-        (position, err) => {
-          if (err) {
-            onError(describeGeoError(err));
-            if (!Capacitor.isNativePlatform() && (err as GeolocationPositionError).code === 1) setPermission('denied');
-            return;
-          }
-          if (position) {
-            setPermission('granted');
-            onFix(toFix(position));
-          }
+      stopRef.current = await watchLocation(
+        (fix) => {
+          setPermission('granted');
+          onFix(fix);
+        },
+        (err) => {
+          onError(describeGeoError(err));
+          if (isPermissionError(err.code)) setPermission('denied');
         },
       );
-      watchId.current = id;
     },
     [stopWatch],
   );

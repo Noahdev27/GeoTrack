@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <application
         android:allowBackup="true"
@@ -43,6 +44,11 @@
     <!-- Géolocalisation (@capacitor/geolocation) : position précise + approximative (Android 12+) -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <!-- Le GPS est recommandé mais pas obligatoire : le mode Simulation fonctionne sans. -->
-    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <!-- Suivi écran éteint (@capacitor-community/background-geolocation) : service de premier plan
+         de type « location ». FOREGROUND_SERVICE(_LOCATION) et POST_NOTIFICATIONS sont fusionnés depuis
+         le manifeste du plugin. ACCESS_BACKGROUND_LOCATION n'est pas nécessaire : le service démarre
+         pendant que l'app est visible. -->
+    <!-- Le GPS est recommandé mais pas obligatoire : le mode Simulation fonctionne sans.
+         tools:node="replace" écrase la déclaration « required » du plugin lors de la fusion. -->
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" tools:node="replace" />
 </manifest>

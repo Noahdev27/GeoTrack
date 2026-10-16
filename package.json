@@ -21,6 +21,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@capacitor-community/background-geolocation": "^1.2.26",
     "@capacitor-community/sqlite": "^8.1.1",
     "@capacitor/android": "^8.5.3",
     "@capacitor/core": "^8.5.3",
