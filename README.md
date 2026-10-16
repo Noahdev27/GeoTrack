@@ -67,6 +67,7 @@ npm run build && npm run test:e2e   # Playwright (viewport mobile)
 | Dashboard         | `components/Dashboard.tsx` + `utils/geo.ts` : distance (Haversine), temps actif hors pauses, vitesse moyenne, instantanée et max. Les relevés bruités sont filtrés (précision > 50 m, micro-déplacements < 3 m, sauts aberrants > 250 km/h).                                                                                     |
 | Offline-first     | `services/db/` + `services/storage.ts` : SQLite sur Android (`@capacitor-community/sqlite`), IndexedDB sur le web. Les points sont ajoutés par lots toutes les 2 s (et au passage en arrière-plan) : si l'app est tuée, le trajet est proposé à la reprise. Les données de la v0.1 (Preferences) sont importées automatiquement. |
 | Synchronisation   | `services/sync.ts` : file des trajets non synchronisés, envoi dès que `@capacitor/network` signale le réseau, nouvel essai avec backoff exponentiel (5 s → 5 min).                                                                                                                                                               |
+| Export            | `utils/export.ts` + `services/exportService.ts` : GPX 1.1 (un `<trkseg>` par segment), GeoJSON (MultiLineString) et CSV (`;`), via la feuille de partage Android ou en téléchargement sur le web.                                                                                                                                |
 
 ### Configurer le backend de synchronisation
 

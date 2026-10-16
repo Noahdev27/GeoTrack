@@ -84,7 +84,7 @@ button:disabled {
 /* ---------- Layout (mobile d'abord) ---------- */
 .app {
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   height: 100vh;
 }
 
@@ -135,6 +135,39 @@ button:disabled {
   background: var(--surface);
   border-radius: var(--radius) var(--radius) 0 0;
   box-shadow: var(--shadow);
+  /* La carte garde toujours au moins ~40 % de l'écran : au-delà, le panneau défile. */
+  max-height: 58vh;
+  max-height: 58dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Petits écrans (iPhone SE, Android compacts) : panneau plus dense. */
+@media (max-height: 740px) {
+  .panel {
+    gap: 8px;
+  }
+  .metric {
+    padding: 6px 10px;
+  }
+  .metric-value {
+    font-size: 1rem;
+  }
+  .metric-primary .metric-value {
+    font-size: 1.25rem;
+  }
+  .segmented button {
+    min-height: 36px;
+  }
+  .btn {
+    min-height: 44px;
+  }
+  .btn-lg {
+    min-height: 48px;
+  }
+  .notice {
+    padding: 8px 10px;
+  }
 }
 
 .panel-handle {
@@ -170,6 +203,7 @@ button:disabled {
     border-radius: 0;
     border-left: 1px solid var(--border);
     box-shadow: none;
+    max-height: none;
     overflow-y: auto;
     padding-bottom: calc(var(--safe-bottom) + 16px);
   }
@@ -326,6 +360,18 @@ button:disabled {
   color: var(--primary-contrast);
 }
 
+.export-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.export-actions > span {
+  margin-right: auto;
+}
+
 .actions {
   display: flex;
   gap: 10px;
@@ -464,6 +510,17 @@ button:disabled {
 /* ---------- Carte ---------- */
 .leaflet-container {
   font: inherit;
+}
+
+/* Le panneau mobile recouvre le bas de la carte de 16 px (coins arrondis) : on remonte l'attribution. */
+.map-area .leaflet-bottom {
+  bottom: 16px;
+}
+
+@media (min-width: 900px), (orientation: landscape) and (max-height: 520px) {
+  .map-area .leaflet-bottom {
+    bottom: 0;
+  }
 }
 
 .route-trace {

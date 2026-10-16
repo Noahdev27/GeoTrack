@@ -66,3 +66,18 @@ test('un rechargement en plein suivi (app tuée) restaure le trajet avec ses poi
   await expect(distance).not.toHaveText('0 m');
   await expect(page.locator('.route-trace')).toHaveCount(1);
 });
+
+test('export GPX d’un trajet terminé', async ({ page }) => {
+  await recordShortTrip(page);
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('group', { name: 'Exporter le trajet' }).getByRole('button', { name: 'GPX' }).click(),
+  ]);
+  expect(download.suggestedFilename()).toMatch(/^geotrack-\d{4}-\d{2}-\d{2}-\d{4}\.gpx$/);
+  const stream = await download.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(chunk as Buffer);
+  const gpx = Buffer.concat(chunks).toString('utf8');
+  expect(gpx).toContain('<gpx version="1.1"');
+  expect((gpx.match(/<trkpt /g) ?? []).length).toBeGreaterThan(3);
+});

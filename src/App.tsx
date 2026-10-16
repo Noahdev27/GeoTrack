@@ -12,6 +12,12 @@ import { isMockSync, syncService } from './services/sync';
 import type { Trip } from './types';
 import { computeStats } from './utils/geo';
 import { formatDateTime } from './utils/format';
+import { ExportActions } from './components/ExportActions';
+import { shareTrip } from './services/exportService';
+import type { ExportFormat } from './utils/export';
+
+/** Marqueur : le message affiché après l'enregistrement suit l'état de la synchro en direct. */
+const SAVED_NOTICE = '__trip-saved__';
 
 export default function App() {
   const tracker = useTracker();
@@ -48,16 +54,12 @@ export default function App() {
       if (saved) {
         setSavedCount((c) => c + 1);
         setViewedTrip(saved);
-        setNotice(
-          sync.online
-            ? 'Trajet enregistré, synchronisation en cours…'
-            : 'Trajet enregistré hors-ligne : il sera synchronisé au retour du réseau.',
-        );
+        setNotice(SAVED_NOTICE);
       }
     } finally {
       setBusy(false);
     }
-  }, [tracker, sync.online]);
+  }, [tracker]);
 
   const handleSelectTrip = useCallback(
     async (id: string) => {
@@ -72,6 +74,23 @@ export default function App() {
     [history],
   );
 
+  const handleExport = useCallback(
+    async (format: ExportFormat) => {
+      if (!viewedTrip) return;
+      setBusy(true);
+      try {
+        await shareTrip(viewedTrip, format);
+      } catch (err) {
+        // Fermer la feuille de partage n'est pas une erreur.
+        const message = err instanceof Error ? err.message : String(err);
+        if (!/cancel/i.test(message)) setNotice(`Export impossible : ${message}`);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [viewedTrip],
+  );
+
   const handleDeleteTrip = useCallback(
     async (id: string) => {
       await history.remove(id);
@@ -81,8 +100,18 @@ export default function App() {
     [history, viewedTrip],
   );
 
+  const savedNotice = !sync.online
+    ? 'Trajet enregistré hors-ligne : il sera synchronisé au retour du réseau.'
+    : sync.syncing || sync.pendingCount > 0
+      ? 'Trajet enregistré, synchronisation en cours…'
+      : 'Trajet enregistré et synchronisé ✓';
   const message =
-    tracker.error ?? (tracker.restored ? 'Trajet interrompu récupéré : appuyez sur Reprendre ou Terminer.' : notice);
+    tracker.error ??
+    (tracker.restored
+      ? 'Trajet interrompu récupéré : appuyez sur Reprendre ou Terminer.'
+      : notice === SAVED_NOTICE
+        ? savedNotice
+        : notice);
   const messageIsError = !!tracker.error;
 
   return (
@@ -153,6 +182,8 @@ export default function App() {
         </div>
 
         <Dashboard stats={active ? tracker.stats : viewedStats} live={tracker.status === 'tracking'} />
+
+        {!active && viewedTrip && <ExportActions busy={busy} onExport={(f) => void handleExport(f)} />}
 
         {message && (
           <p className={`notice ${messageIsError ? 'notice-error' : ''}`} role={messageIsError ? 'alert' : 'status'}>
