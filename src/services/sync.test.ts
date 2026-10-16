@@ -12,7 +12,7 @@ vi.mock('@capacitor/preferences', () => ({
 vi.mock('@capacitor/network', () => ({ Network: {} }));
 
 const { tripStorage } = await import('./storage');
-const { SyncService } = await import('./sync');
+const { SyncService, httpTransport, mockTransport } = await import('./sync');
 
 const trip = (id: string): Trip => ({
   id,
@@ -108,5 +108,40 @@ describe('SyncService', () => {
     expect(upload).toHaveBeenCalledTimes(2);
     expect(await tripStorage.listUnsynced()).toEqual([]);
     svc.dispose();
+  });
+});
+
+describe('transports', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it('httpTransport envoie le trajet en POST JSON', async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 201 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await httpTransport('https://api.example.test/trips').upload(trip('a'));
+    expect(fetchMock).toHaveBeenCalledWith('https://api.example.test/trips', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(trip('a')),
+    });
+  });
+
+  it('httpTransport rejette une réponse en erreur', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status: 503 })),
+    );
+    await expect(httpTransport('https://api.example.test/trips').upload(trip('a'))).rejects.toThrow('HTTP 503');
+  });
+
+  it('mockTransport échoue hors-ligne', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('navigator', { onLine: false });
+    const upload = mockTransport(10).upload(trip('a'));
+    const assertion = expect(upload).rejects.toThrow('Réseau indisponible');
+    await vi.advanceTimersByTimeAsync(10);
+    await assertion;
   });
 });

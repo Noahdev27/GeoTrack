@@ -27,14 +27,14 @@ Le workflow GitHub Actions `.github/workflows/android.yml` exécute les tests, l
 
 ## Fonctionnalités
 
-| Fonctionnalité | Implémentation |
-| --- | --- |
+| Fonctionnalité    | Implémentation                                                                                                                                                                                                                                                             |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Carte interactive | `components/MapView.tsx` : tuiles OpenStreetMap, tracé par segment (pas de ligne fantôme après une pause), marqueur orienté selon le cap, cercle de précision GPS, suivi automatique désactivé au glisser + bouton de recentrage, recadrage sur un trajet de l'historique. |
-| Simulation GPS | `services/simulation.ts` : véhicule qui suit un itinéraire point par point (Louvre → Tour Eiffel), vitesse réaliste variable, bruit GPS, accélération ×1 / ×2 / ×5 / ×10, aller-retour continu. |
-| GPS natif | `hooks/useGeolocation.ts` : `@capacitor/geolocation` (haute précision, `watchPosition`), vérification et demande des permissions, gestion du refus, de la localisation approximative (Android 12+) et des services de localisation désactivés. |
-| Dashboard | `components/Dashboard.tsx` + `utils/geo.ts` : distance (Haversine), temps actif hors pauses, vitesse moyenne, instantanée et max. Les relevés bruités sont filtrés (précision > 50 m, micro-déplacements < 3 m, sauts aberrants > 250 km/h). |
-| Offline-first | `services/storage.ts` : trajets stockés avec `@capacitor/preferences` (SharedPreferences sur Android, localStorage sur le web). Le trajet en cours est sauvegardé toutes les 10 s et au passage en arrière-plan, puis proposé à la reprise si l'app a été tuée. |
-| Synchronisation | `services/sync.ts` : file des trajets non synchronisés, envoi dès que `@capacitor/network` signale le réseau, nouvel essai avec backoff exponentiel (5 s → 5 min). |
+| Simulation GPS    | `services/simulation.ts` : véhicule qui suit un itinéraire point par point (Louvre → Tour Eiffel), vitesse réaliste variable, bruit GPS, accélération ×1 / ×2 / ×5 / ×10, aller-retour continu.                                                                            |
+| GPS natif         | `hooks/useGeolocation.ts` : `@capacitor/geolocation` (haute précision, `watchPosition`), vérification et demande des permissions, gestion du refus, de la localisation approximative (Android 12+) et des services de localisation désactivés.                             |
+| Dashboard         | `components/Dashboard.tsx` + `utils/geo.ts` : distance (Haversine), temps actif hors pauses, vitesse moyenne, instantanée et max. Les relevés bruités sont filtrés (précision > 50 m, micro-déplacements < 3 m, sauts aberrants > 250 km/h).                               |
+| Offline-first     | `services/storage.ts` : trajets stockés avec `@capacitor/preferences` (SharedPreferences sur Android, localStorage sur le web). Le trajet en cours est sauvegardé toutes les 10 s et au passage en arrière-plan, puis proposé à la reprise si l'app a été tuée.            |
+| Synchronisation   | `services/sync.ts` : file des trajets non synchronisés, envoi dès que `@capacitor/network` signale le réseau, nouvel essai avec backoff exponentiel (5 s → 5 min).                                                                                                         |
 
 ### Configurer le backend de synchronisation
 

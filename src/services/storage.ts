@@ -61,7 +61,9 @@ export const tripStorage = {
     return serialized(async () => {
       await writeJson(tripKey(trip.id), trip);
       const index = (await readJson<TripSummary[]>(INDEX_KEY)) ?? [];
-      const next = [toSummary(trip), ...index.filter((t) => t.id !== trip.id)].sort((a, b) => b.startedAt - a.startedAt);
+      const next = [toSummary(trip), ...index.filter((t) => t.id !== trip.id)].sort(
+        (a, b) => b.startedAt - a.startedAt,
+      );
       await writeJson(INDEX_KEY, next);
     });
   },

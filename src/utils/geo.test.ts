@@ -33,7 +33,7 @@ describe('bearing', () => {
 });
 
 describe('totalDistance', () => {
-  it("ne compte pas la distance entre deux segments (reprise après pause)", () => {
+  it('ne compte pas la distance entre deux segments (reprise après pause)', () => {
     const a = pt(0, 0, 0, 0);
     const b = pt(0.001, 0, 10_000, 0);
     const c = pt(0.01, 0, 20_000, 1); // saut pendant la pause

@@ -29,7 +29,14 @@ describe('GpsSimulator', () => {
 
   it('avance à la vitesse demandée', () => {
     let t = 0;
-    const sim = new GpsSimulator({ route, minSpeedKmh: 36, maxSpeedKmh: 36, jitterMeters: 0, random: fixed, now: () => (t += 1000) });
+    const sim = new GpsSimulator({
+      route,
+      minSpeedKmh: 36,
+      maxSpeedKmh: 36,
+      jitterMeters: 0,
+      random: fixed,
+      now: () => (t += 1000),
+    });
     const start = sim.currentFix();
     const fix = sim.step();
     expect(haversineDistance(start, fix)).toBeCloseTo(10, 1); // 36 km/h = 10 m/s
@@ -37,7 +44,14 @@ describe('GpsSimulator', () => {
   });
 
   it('applique le multiplicateur de vitesse', () => {
-    const sim = new GpsSimulator({ route, minSpeedKmh: 36, maxSpeedKmh: 36, jitterMeters: 0, random: fixed, speedMultiplier: 5 });
+    const sim = new GpsSimulator({
+      route,
+      minSpeedKmh: 36,
+      maxSpeedKmh: 36,
+      jitterMeters: 0,
+      random: fixed,
+      speedMultiplier: 5,
+    });
     const start = sim.currentFix();
     expect(haversineDistance(start, sim.step())).toBeCloseTo(50, 1);
   });

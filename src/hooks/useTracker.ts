@@ -1,9 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { LatLng, TrackPoint, TrackingMode, TrackingStatus, Trip } from '../types';
 import { GpsSimulator } from '../services/simulation';
 import { tripStorage } from '../services/storage';
 import { syncService } from '../services/sync';
-import { activeDuration, computeStats, DEFAULT_GPS_FILTER, shouldAcceptPoint, type PointFilterOptions } from '../utils/geo';
+import {
+  activeDuration,
+  computeStats,
+  DEFAULT_GPS_FILTER,
+  shouldAcceptPoint,
+  type PointFilterOptions,
+} from '../utils/geo';
 import { formatDateTime, generateId } from '../utils/format';
 import { useGeolocation, type GeoFix } from './useGeolocation';
 
@@ -11,7 +17,11 @@ import { useGeolocation, type GeoFix } from './useGeolocation';
 const ACTIVE_SAVE_INTERVAL_MS = 10_000;
 
 // Le simulateur peut être accéléré (×10) : pas de plafond de vitesse « aberrante » en simulation.
-const SIM_FILTER: PointFilterOptions = { ...DEFAULT_GPS_FILTER, minDistance: 0.5, maxSpeedKmh: Number.POSITIVE_INFINITY };
+const SIM_FILTER: PointFilterOptions = {
+  ...DEFAULT_GPS_FILTER,
+  minDistance: 0.5,
+  maxSpeedKmh: Number.POSITIVE_INFINITY,
+};
 
 export interface LiveFix extends LatLng {
   accuracy: number | null;
@@ -57,7 +67,12 @@ export function useTracker() {
   const segmentRef = useRef(0);
   const simulatorRef = useRef<GpsSimulator | null>(null);
   const lastSaveRef = useRef(0);
-  tripRef.current = trip;
+  const simSpeedRef = useRef(simSpeed);
+
+  // Miroirs pour les callbacks (lus hors rendu, après commit).
+  useLayoutEffect(() => {
+    tripRef.current = trip;
+  }, [trip]);
 
   // --- Reprise d'un trajet interrompu (app tuée pendant un suivi) ---------------------------
   useEffect(() => {
@@ -102,19 +117,16 @@ export function useTracker() {
     if (status !== 'tracking') return;
 
     if (mode === 'simulation') {
-      const sim = (simulatorRef.current ??= new GpsSimulator({ speedMultiplier: simSpeed }));
+      const sim = (simulatorRef.current ??= new GpsSimulator({ speedMultiplier: simSpeedRef.current }));
       sim.start((f) => ingest({ ...f, altitude: null }, SIM_FILTER));
       return () => sim.stop();
     }
 
     let cancelled = false;
-    startWatch(
-      (f) => {
-        setError(null);
-        ingest(f, DEFAULT_GPS_FILTER);
-      },
-      setError,
-    )
+    startWatch((f) => {
+      setError(null);
+      ingest(f, DEFAULT_GPS_FILTER);
+    }, setError)
       .then(() => {
         if (cancelled) stopWatch();
       })
@@ -123,17 +135,17 @@ export function useTracker() {
       cancelled = true;
       stopWatch();
     };
-    // simSpeed est volontairement absent : il est appliqué à chaud ci-dessous sans redémarrer la source.
   }, [status, mode, ingest, startWatch, stopWatch]);
 
+  // La vitesse de simulation s'applique à chaud, sans redémarrer la source.
   useEffect(() => {
+    simSpeedRef.current = simSpeed;
     simulatorRef.current?.setSpeedMultiplier(simSpeed);
   }, [simSpeed]);
 
-  // --- Horloge (chrono en direct) -----------------------------------------------------------
+  // --- Horloge (chrono en direct ; `now` est initialisé par start() / resume()) ---------------
   useEffect(() => {
     if (status !== 'tracking') return;
-    setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, [status]);
@@ -163,7 +175,9 @@ export function useTracker() {
       try {
         const ok = await requestPermission();
         if (!ok) {
-          setError("L'accès à la localisation est nécessaire pour le suivi GPS. Autorisez-le dans les réglages, ou utilisez le mode Simulation.");
+          setError(
+            "L'accès à la localisation est nécessaire pour le suivi GPS. Autorisez-le dans les réglages, ou utilisez le mode Simulation.",
+          );
           return;
         }
       } catch (e) {
@@ -204,6 +218,7 @@ export function useTracker() {
     setRestored(false);
     segmentRef.current = (current.points.at(-1)?.segment ?? -1) + 1;
     const t = Date.now();
+    setNow(t);
     setTrip({ ...current, resumedAt: t, updatedAt: t });
     setStatus('tracking');
   }, [requestPermission]);

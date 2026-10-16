@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Circle, CircleMarker, MapContainer, Marker, Polyline, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import type { LatLng, TrackPoint } from '../types';
@@ -57,7 +57,11 @@ function splitSegments(points: readonly TrackPoint[]): [number, number][][] {
   return out;
 }
 
-function FollowController({ position, follow, onFollowChange }: Pick<MapViewProps, 'position' | 'follow' | 'onFollowChange'>) {
+function FollowController({
+  position,
+  follow,
+  onFollowChange,
+}: Pick<MapViewProps, 'position' | 'follow' | 'onFollowChange'>) {
   const map = useMap();
   useMapEvents({ dragstart: () => onFollowChange(false) });
   useEffect(() => {
@@ -68,14 +72,11 @@ function FollowController({ position, follow, onFollowChange }: Pick<MapViewProp
 
 function FitBounds({ points, fitKey }: { points: readonly TrackPoint[]; fitKey?: string | null }) {
   const map = useMap();
-  // Les points sont lus via une ref : le recadrage ne se déclenche que lorsque fitKey change.
-  const pointsRef = useRef(points);
-  pointsRef.current = points;
+  // fitKey n'est défini que pour un trajet consulté (points figés) : pas de recadrage pendant un suivi.
   useEffect(() => {
-    const pts = pointsRef.current;
-    if (!fitKey || pts.length === 0) return;
-    map.fitBounds(L.latLngBounds(pts.map(toTuple)), { padding: [32, 32], maxZoom: 17 });
-  }, [map, fitKey]);
+    if (!fitKey || points.length === 0) return;
+    map.fitBounds(L.latLngBounds(points.map(toTuple)), { padding: [32, 32], maxZoom: 17 });
+  }, [map, fitKey, points]);
   return null;
 }
 
@@ -100,25 +101,35 @@ export function MapView(props: MapViewProps) {
   const start = points[0];
 
   return (
-    <MapContainer
-      center={toTuple(initialCenter)}
-      zoom={15}
-      className="map"
-      zoomControl={false}
-      attributionControl
-    >
+    <MapContainer center={toTuple(initialCenter)} zoom={15} className="map" zoomControl={false} attributionControl>
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         maxZoom={19}
       />
       {plannedRoute && plannedRoute.length > 1 && (
-        <Polyline positions={plannedRoute.map(toTuple)} className="route-planned" pathOptions={{ weight: 4, dashArray: '6 8' }} />
+        <Polyline
+          positions={plannedRoute.map(toTuple)}
+          className="route-planned"
+          pathOptions={{ weight: 4, dashArray: '6 8' }}
+        />
       )}
       {segments.map((seg, i) => (
-        <Polyline key={i} positions={seg} className="route-trace" pathOptions={{ weight: 5, lineCap: 'round', lineJoin: 'round' }} />
+        <Polyline
+          key={i}
+          positions={seg}
+          className="route-trace"
+          pathOptions={{ weight: 5, lineCap: 'round', lineJoin: 'round' }}
+        />
       ))}
-      {start && <CircleMarker center={toTuple(start)} radius={7} className="route-start" pathOptions={{ weight: 3, fillOpacity: 1 }} />}
+      {start && (
+        <CircleMarker
+          center={toTuple(start)}
+          radius={7}
+          className="route-start"
+          pathOptions={{ weight: 3, fillOpacity: 1 }}
+        />
+      )}
       {position && accuracy != null && accuracy > 5 && (
         <Circle center={toTuple(position)} radius={accuracy} className="accuracy-circle" pathOptions={{ weight: 1 }} />
       )}

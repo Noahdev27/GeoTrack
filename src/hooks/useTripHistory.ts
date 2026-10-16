@@ -13,8 +13,16 @@ export function useTripHistory(refreshKey: unknown) {
   }, []);
 
   useEffect(() => {
-    void refresh();
-  }, [refresh, refreshKey]);
+    let cancelled = false;
+    void tripStorage.listTrips().then((list) => {
+      if (cancelled) return;
+      setTrips(list);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshKey]);
 
   const remove = useCallback(
     async (id: string) => {

@@ -8,7 +8,15 @@ export default defineConfig({
   base: './',
   server: { host: true },
   test: {
+    // Environnement node par défaut ; les tests DOM déclarent `// @vitest-environment jsdom`.
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.{ts,tsx}'],
+    setupFiles: ['src/test/setup.ts'],
+    coverage: {
+      provider: 'v8',
+      include: ['src/utils/**', 'src/services/**'],
+      exclude: ['**/*.test.ts'],
+      thresholds: { lines: 80, functions: 80, statements: 80, branches: 75 },
+    },
   },
 });

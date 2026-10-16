@@ -13,7 +13,13 @@ interface TripHistoryProps {
 export function TripHistory({ trips, loading, selectedId, onSelect, onDelete, onClose }: TripHistoryProps) {
   return (
     <div className="sheet-backdrop" onClick={onClose}>
-      <aside className="sheet" role="dialog" aria-modal="true" aria-label="Historique des trajets" onClick={(e) => e.stopPropagation()}>
+      <aside
+        className="sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Historique des trajets"
+        onClick={(e) => e.stopPropagation()}
+      >
         <header className="sheet-header">
           <h2>Mes trajets</h2>
           <button type="button" className="icon-btn" onClick={onClose} aria-label="Fermer">
@@ -33,7 +39,8 @@ export function TripHistory({ trips, loading, selectedId, onSelect, onDelete, on
                     {t.mode === 'gps' ? '📡' : '🧪'} {formatDateTime(t.startedAt)}
                   </span>
                   <span className="trip-meta">
-                    {formatDistance(t.stats.distanceMeters)} · {formatDuration(t.stats.durationMs)} · {formatSpeed(t.stats.avgSpeedKmh)}
+                    {formatDistance(t.stats.distanceMeters)} · {formatDuration(t.stats.durationMs)} ·{' '}
+                    {formatSpeed(t.stats.avgSpeedKmh)}
                   </span>
                   <span className={`badge ${t.syncedAt ? 'badge-ok' : 'badge-pending'}`}>
                     {t.syncedAt ? 'Synchronisé' : 'En attente de synchro'}

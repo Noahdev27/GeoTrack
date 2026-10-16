@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { formatDistance, formatDuration, formatSpeed } from './format';
 
 // toLocaleString('fr-FR') utilise une virgule décimale (et parfois une espace insécable).
-const norm = (s: string) => s.replace(/ | /g, ' ');
+const norm = (s: string) => s.replace(/\u202f|\u00a0/g, ' ');
 
 describe('format', () => {
   it('formatDistance', () => {

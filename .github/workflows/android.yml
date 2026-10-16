@@ -14,8 +14,18 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm test
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run test:coverage
       - run: npm run build
+      - name: Installer Chromium pour Playwright
+        run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
 
   android-apk:
     needs: web

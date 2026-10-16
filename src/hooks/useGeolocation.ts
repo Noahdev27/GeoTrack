@@ -40,8 +40,33 @@ export function describeGeoError(err: unknown): string {
     return 'Les services de localisation sont désactivés. Activez le GPS puis réessayez.';
   }
   if (msg.includes('timeout')) return 'Aucun signal GPS pour le moment. Placez-vous à découvert.';
-  if (msg.includes('not available') || msg.includes('unavailable')) return 'Géolocalisation indisponible sur cet appareil.';
+  if (msg.includes('not available') || msg.includes('unavailable'))
+    return 'Géolocalisation indisponible sur cet appareil.';
   return `Erreur de géolocalisation : ${raw}`;
+}
+
+interface PermissionState {
+  permission: PermissionStatus;
+  /** Seule la localisation approximative est accordée (Android 12+). */
+  approximate: boolean;
+}
+
+/** Lit l'état courant de la permission de localisation (sans rien demander à l'utilisateur). */
+async function readPermission(): Promise<PermissionState> {
+  if (!Capacitor.isNativePlatform() && !('geolocation' in navigator)) {
+    return { permission: 'unavailable', approximate: false };
+  }
+  try {
+    const status = await Geolocation.checkPermissions();
+    return {
+      permission: mapPermission(status),
+      approximate: status.location !== 'granted' && status.coarseLocation === 'granted',
+    };
+  } catch {
+    // Android lève une erreur si les services de localisation sont coupés ;
+    // certains navigateurs n'exposent pas l'API Permissions.
+    return { permission: Capacitor.isNativePlatform() ? 'unavailable' : 'prompt', approximate: false };
+  }
 }
 
 /**
@@ -53,25 +78,16 @@ export function useGeolocation() {
   const [approximate, setApproximate] = useState(false);
   const watchId = useRef<string | null>(null);
 
-  const checkPermission = useCallback(async (): Promise<PermissionStatus> => {
-    if (!Capacitor.isNativePlatform() && !('geolocation' in navigator)) {
-      setPermission('unavailable');
-      return 'unavailable';
-    }
-    try {
-      const status = await Geolocation.checkPermissions();
-      const mapped = mapPermission(status);
-      setApproximate(status.location !== 'granted' && status.coarseLocation === 'granted');
-      setPermission(mapped);
-      return mapped;
-    } catch {
-      // Android lève une erreur si les services de localisation sont coupés ;
-      // certains navigateurs n'exposent pas l'API Permissions.
-      const fallback: PermissionStatus = Capacitor.isNativePlatform() ? 'unavailable' : 'prompt';
-      setPermission(fallback);
-      return fallback;
-    }
+  const applyPermission = useCallback((state: PermissionState) => {
+    setPermission(state.permission);
+    setApproximate(state.approximate);
+    return state.permission;
   }, []);
+
+  const checkPermission = useCallback(
+    async (): Promise<PermissionStatus> => applyPermission(await readPermission()),
+    [applyPermission],
+  );
 
   /** Demande l'autorisation si nécessaire. Retourne `true` si le suivi peut démarrer. */
   const requestPermission = useCallback(async (): Promise<boolean> => {
@@ -85,15 +101,16 @@ export function useGeolocation() {
     }
     try {
       const result = await Geolocation.requestPermissions({ permissions: ['location', 'coarseLocation'] });
-      const mapped = mapPermission(result);
-      setApproximate(result.location !== 'granted' && result.coarseLocation === 'granted');
-      setPermission(mapped);
+      const mapped = applyPermission({
+        permission: mapPermission(result),
+        approximate: result.location !== 'granted' && result.coarseLocation === 'granted',
+      });
       return mapped === 'granted';
     } catch (err) {
       setPermission('unavailable');
       throw new Error(describeGeoError(err));
     }
-  }, [checkPermission]);
+  }, [checkPermission, applyPermission]);
 
   const stopWatch = useCallback(() => {
     if (watchId.current) {
@@ -125,9 +142,15 @@ export function useGeolocation() {
   );
 
   useEffect(() => {
-    void checkPermission();
-    return stopWatch;
-  }, [checkPermission, stopWatch]);
+    let cancelled = false;
+    void readPermission().then((state) => {
+      if (!cancelled) applyPermission(state);
+    });
+    return () => {
+      cancelled = true;
+      stopWatch();
+    };
+  }, [applyPermission, stopWatch]);
 
   return { permission, approximate, checkPermission, requestPermission, startWatch, stopWatch };
 }

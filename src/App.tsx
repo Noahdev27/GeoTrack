@@ -29,7 +29,10 @@ export default function App() {
   const shown = active ?? viewedTrip;
   const lastPoint = shown?.points.at(-1) ?? null;
   const position = active ? (tracker.liveFix ?? lastPoint) : lastPoint;
-  const viewedStats = useMemo(() => (viewedTrip ? computeStats(viewedTrip, viewedTrip.endedAt ?? viewedTrip.updatedAt) : null), [viewedTrip]);
+  const viewedStats = useMemo(
+    () => (viewedTrip ? computeStats(viewedTrip, viewedTrip.endedAt ?? viewedTrip.updatedAt) : null),
+    [viewedTrip],
+  );
 
   const handleStart = useCallback(async () => {
     setViewedTrip(null);
@@ -45,7 +48,11 @@ export default function App() {
       if (saved) {
         setSavedCount((c) => c + 1);
         setViewedTrip(saved);
-        setNotice(sync.online ? 'Trajet enregistré, synchronisation en cours…' : 'Trajet enregistré hors-ligne : il sera synchronisé au retour du réseau.');
+        setNotice(
+          sync.online
+            ? 'Trajet enregistré, synchronisation en cours…'
+            : 'Trajet enregistré hors-ligne : il sera synchronisé au retour du réseau.',
+        );
       }
     } finally {
       setBusy(false);
@@ -74,7 +81,8 @@ export default function App() {
     [history, viewedTrip],
   );
 
-  const message = tracker.error ?? (tracker.restored ? 'Trajet interrompu récupéré : appuyez sur Reprendre ou Terminer.' : notice);
+  const message =
+    tracker.error ?? (tracker.restored ? 'Trajet interrompu récupéré : appuyez sur Reprendre ou Terminer.' : notice);
   const messageIsError = !!tracker.error;
 
   return (
@@ -84,7 +92,12 @@ export default function App() {
           <img src="./favicon.svg" alt="" width={28} height={28} />
           <span>GeoTrack</span>
         </div>
-        <button type="button" className="icon-btn" onClick={() => setHistoryOpen(true)} aria-label="Historique des trajets">
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={() => setHistoryOpen(true)}
+          aria-label="Historique des trajets"
+        >
           🗂 <span className="hide-sm">Historique</span>
           {history.trips.length > 0 && <span className="counter">{history.trips.length}</span>}
         </button>
@@ -152,7 +165,9 @@ export default function App() {
           </p>
         )}
         {tracker.mode === 'gps' && tracker.approximateLocation && (
-          <p className="notice">Localisation approximative uniquement : activez la « position exacte » pour un tracé précis.</p>
+          <p className="notice">
+            Localisation approximative uniquement : activez la « position exacte » pour un tracé précis.
+          </p>
         )}
 
         <Controls

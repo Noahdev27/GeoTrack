@@ -32,10 +32,18 @@ export function cumulativeDistances(route: readonly LatLng[]): number[] {
 }
 
 /** Position sur l'itinéraire après avoir parcouru `distance` mètres depuis le départ. */
-export function positionAlongRoute(route: readonly LatLng[], cumul: readonly number[], distance: number): RoutePosition {
+export function positionAlongRoute(
+  route: readonly LatLng[],
+  cumul: readonly number[],
+  distance: number,
+): RoutePosition {
   if (route.length === 0) throw new Error('Itinéraire vide');
   if (route.length === 1 || distance <= 0) {
-    return { position: route[0], heading: route.length > 1 ? bearing(route[0], route[1]) : 0, finished: route.length === 1 };
+    return {
+      position: route[0],
+      heading: route.length > 1 ? bearing(route[0], route[1]) : 0,
+      finished: route.length === 1,
+    };
   }
   const total = cumul[cumul.length - 1];
   if (distance >= total) {
@@ -47,7 +55,11 @@ export function positionAlongRoute(route: readonly LatLng[], cumul: readonly num
   while (cumul[i] < distance) i++;
   const segLen = cumul[i] - cumul[i - 1];
   const t = segLen > 0 ? (distance - cumul[i - 1]) / segLen : 0;
-  return { position: interpolate(route[i - 1], route[i], t), heading: bearing(route[i - 1], route[i]), finished: false };
+  return {
+    position: interpolate(route[i - 1], route[i], t),
+    heading: bearing(route[i - 1], route[i]),
+    finished: false,
+  };
 }
 
 export interface SimulatedFix {
