@@ -1,6 +1,6 @@
 # Cahier des charges — GeoTrack V2 (passage à l'échelle)
 
-> Version 1.0 — 16/10/2026
+> Version 1.1 — 16/10/2026 (phases 0 et 1 livrées)
 > Point de départ : MVP livré (commit `9999e36`). Ce document décrit la cible produit, les exigences et la feuille de route. Les prompts d'exécution sont dans [`PROMPTS.md`](./PROMPTS.md).
 
 ---
@@ -19,14 +19,18 @@
 | Android            | Projet Capacitor 8, permissions, APK debug via CI                 | `android/`, `.github/workflows/android.yml`                 |
 | Tests              | 36 tests Vitest (utils, services)                                 | `src/**/*.test.ts`                                          |
 
-### 1.2 Limites à lever
+### 1.2 Limites à lever — avancement
 
-1. **Pas de suivi en arrière-plan** : écran éteint ou app en arrière-plan, la WebView est suspendue et les points sont perdus.
-2. **Pas de vrai backend** : pas de comptes, la synchro ne va nulle part et les données restent sur un seul appareil.
-3. **Le stockage ne tient pas la charge** : Preferences réécrit tout le JSON du trajet toutes les 10 s, ce qui ne passe pas au-delà de quelques milliers de points.
-4. **Pas de carte hors-ligne** : sans réseau, le fond de carte est vide.
-5. **Pas de dimension « livraison »** : ni mission, ni destinataire, ni preuve de livraison, ni suivi côté client ou dispatcher.
-6. **Qualité** : pas de lint, pas de tests de composants ni E2E, pas d'APK release signé.
+| #   | Limite initiale                                                            | État                                                                                                                                        |
+| --- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Pas de suivi en arrière-plan                                               | ✅ **L1.2** : service de premier plan Android (`@capacitor-community/background-geolocation`). À valider sur appareil (`TESTS_MANUELS.md`). |
+| 2   | Pas de vrai backend (comptes, synchro réelle, multi-appareils)             | ⏳ Phase 2, bloquée par la **décision D1**                                                                                                  |
+| 3   | Stockage qui ne tient pas la charge (JSON complet réécrit toutes les 10 s) | ✅ **L1.1** : SQLite (Android) / IndexedDB (web), points append-only, métriques O(1), tracé simplifié                                       |
+| 4   | Pas de carte hors-ligne                                                    | ⏳ L4.1, bloquée par la **décision D3** (fournisseur de tuiles)                                                                             |
+| 5   | Pas de dimension « livraison » (missions, preuve, dispatcher, client)      | ⏳ Phase 3 (après le backend)                                                                                                               |
+| 6   | Qualité : pas de lint, ni tests de composants / E2E, ni APK release signé  | ✅ **L0.1 / L0.2** : ESLint + Prettier, 110 tests unitaires/composants/hooks, 4 E2E Playwright, release signée sur tag                      |
+
+Livré en plus : export GPX / GeoJSON / CSV (**L1.3**), mise en page adaptée aux petits écrans.
 
 ---
 
