@@ -1,4 +1,22 @@
+import groovy.json.JsonSlurper
+
 apply plugin: 'com.android.application'
+
+// --- Version : tag git (CI) ou package.json ---------------------------------------------------
+// GEOTRACK_VERSION_NAME est fourni par le workflow de release (tag vX.Y.Z → X.Y.Z).
+def appVersionName = System.getenv('GEOTRACK_VERSION_NAME') ?:
+        new JsonSlurper().parse(rootProject.file('../package.json')).version
+def versionParts = (appVersionName =~ /^(\d+)\.(\d+)\.(\d+)/)
+if (!versionParts.find()) {
+    throw new GradleException("Version invalide : '${appVersionName}' (format attendu X.Y.Z)")
+}
+def appVersionCode = versionParts.group(1).toInteger() * 10000 +
+        versionParts.group(2).toInteger() * 100 +
+        versionParts.group(3).toInteger()
+
+// --- Signature release : uniquement si le keystore est fourni par l'environnement ----------------
+def keystorePath = System.getenv('GEOTRACK_KEYSTORE_PATH')
+def hasReleaseSigning = keystorePath && file(keystorePath).exists()
 
 android {
     namespace = "com.geotrack.app"
@@ -7,8 +25,8 @@ android {
         applicationId "com.geotrack.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode appVersionCode
+        versionName appVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +34,22 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(keystorePath)
+                storePassword System.getenv('GEOTRACK_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('GEOTRACK_KEY_ALIAS')
+                keyPassword System.getenv('GEOTRACK_KEY_PASSWORD')
+            }
+        }
+    }
     buildTypes {
         release {
+            // Sans keystore, l'APK release est produit non signé (app-release-unsigned.apk).
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

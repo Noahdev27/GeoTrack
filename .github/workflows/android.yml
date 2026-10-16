@@ -45,9 +45,10 @@ jobs:
       - run: npm ci
       - name: Build web + cap sync android
         run: npm run cap:sync
-      - name: Build APK debug
+      # assembleRelease (non signé sans secrets) valide aussi la configuration release.
+      - name: Build APK debug + release
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew assembleDebug assembleRelease --no-daemon
       - uses: actions/upload-artifact@v4
         with:
           name: geotrack-debug-apk

@@ -9,7 +9,7 @@ Application mobile hybride de suivi de trajet en temps réel : carte dynamique, 
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # tests unitaires (calculs, simulateur, stockage, synchro)
+npm test           # tests unitaires, de composants et de hooks
 npm run build      # typecheck + build de production dans dist/
 ```
 
@@ -24,6 +24,38 @@ npm run android:apk   # ou en ligne de commande → android/app/build/outputs/ap
 ```
 
 Le workflow GitHub Actions `.github/workflows/android.yml` exécute les tests, le build web puis `assembleDebug`, et publie l'APK en artefact (`geotrack-debug-apk`).
+
+## Publier une version (APK/AAB signés)
+
+1. **Créer le keystore** (une seule fois, à conserver précieusement hors du dépôt : le perdre empêche toute mise à jour sur Google Play) :
+
+   ```bash
+   keytool -genkeypair -v -keystore geotrack-release.jks -alias geotrack \
+     -keyalg RSA -keysize 4096 -validity 10000
+   base64 -w0 geotrack-release.jks > keystore.b64   # macOS : base64 -i geotrack-release.jks
+   ```
+
+2. **Ajouter les secrets GitHub** (Settings → Secrets and variables → Actions) :
+   `GEOTRACK_KEYSTORE_BASE64` (contenu de `keystore.b64`), `GEOTRACK_KEYSTORE_PASSWORD`, `GEOTRACK_KEY_ALIAS` (`geotrack`), `GEOTRACK_KEY_PASSWORD`.
+
+3. **Publier** : mettre à jour `CHANGELOG.md` (section `## [X.Y.Z] - date`) et `version` dans `package.json`, puis :
+
+   ```bash
+   git tag v0.2.0 && git push origin v0.2.0
+   ```
+
+   Le workflow `release.yml` construit l'APK et l'AAB signés, vérifie la signature et crée une GitHub Release avec les notes du CHANGELOG. `versionName` = `X.Y.Z` et `versionCode` = `X×10000 + Y×100 + Z`.
+
+Build signé en local : exporter les mêmes variables (`GEOTRACK_KEYSTORE_PATH` = chemin du `.jks`, plus les mots de passe et l'alias) puis `cd android && ./gradlew assembleRelease`. Sans ces variables, `assembleRelease` produit un APK non signé.
+
+## Qualité
+
+```bash
+npm run lint            # ESLint
+npm run format:check    # Prettier
+npm run test:coverage   # Vitest + couverture (seuils sur utils/services)
+npm run build && npm run test:e2e   # Playwright (viewport mobile)
+```
 
 ## Fonctionnalités
 

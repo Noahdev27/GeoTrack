@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GEOTRACK_KEYSTORE_PATH: ${{ runner.temp }}/release.jks
+      GEOTRACK_KEYSTORE_PASSWORD: ${{ secrets.GEOTRACK_KEYSTORE_PASSWORD }}
+      GEOTRACK_KEY_ALIAS: ${{ secrets.GEOTRACK_KEY_ALIAS }}
+      GEOTRACK_KEY_PASSWORD: ${{ secrets.GEOTRACK_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Version depuis le tag
+        run: echo "GEOTRACK_VERSION_NAME=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Décoder le keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.GEOTRACK_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::Secret GEOTRACK_KEYSTORE_BASE64 absent : voir README, section « Publier une version »."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$GEOTRACK_KEYSTORE_PATH"
+
+      - run: npm ci
+      - run: npm test
+      - name: Build web + cap sync android
+        run: npm run cap:sync
+
+      - name: Build APK + AAB release signés
+        working-directory: android
+        run: ./gradlew assembleRelease bundleRelease --no-daemon
+
+      - name: Vérifier la signature
+        run: |
+          APKSIGNER="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner"
+          "$APKSIGNER" verify --print-certs android/app/build/outputs/apk/release/app-release.apk
+          mkdir -p dist-release
+          cp android/app/build/outputs/apk/release/app-release.apk "dist-release/geotrack-${GEOTRACK_VERSION_NAME}.apk"
+          cp android/app/build/outputs/bundle/release/app-release.aab "dist-release/geotrack-${GEOTRACK_VERSION_NAME}.aab"
+
+      - name: Notes de version (CHANGELOG)
+        run: |
+          awk -v v="$GEOTRACK_VERSION_NAME" '
+            $0 ~ "^## \\[" v "\\]" { found = 1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          [ -s release-notes.md ] || echo "Version ${GEOTRACK_VERSION_NAME}" > release-notes.md
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          body_path: release-notes.md
+          files: dist-release/*

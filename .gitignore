@@ -13,3 +13,5 @@ coverage
 *.log
 playwright-report
 test-results
+*.jks
+*.keystore
