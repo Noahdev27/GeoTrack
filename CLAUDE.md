@@ -34,6 +34,7 @@ npx cap sync android
 ## Conventions
 
 - Textes UI, commentaires et messages de commit en **français**. Identifiants de code en anglais.
+- **Commits** : auteur et committer `noahdev27 <ngandeu.noe27@gmail.com>` uniquement (`git config user.name/user.email` dans le dépôt, à refaire dans un nouveau clone). Aucun trailer `Co-Authored-By` ni `Claude-Session`, aucune mention de Claude / Anthropic dans les messages de commit, titres ou descriptions de PR. Pas de signature avec la clé de l'environnement cloud (`git config commit.gpgsign false`).
 - Style : 2 espaces, quotes simples, point-virgules, lignes ≤ ~120 colonnes.
 - Logique métier dans des fonctions pures ou des services testables, pas dans les composants.
 - Toute nouvelle logique a des tests. Les plugins Capacitor sont mockés avec `vi.mock` (doublures dans `src/test/mocks.ts`). IndexedDB est fourni par fake-indexeddb (base vierge à chaque test) ; le SQL est testé avec sql.js (`src/test/sqljsDriver.ts`).
